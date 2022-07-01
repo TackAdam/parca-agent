@@ -15,6 +15,7 @@
 package profiler
 
 import (
+	"C" //gofumpt:skip
 	"bytes"
 	"context"
 	_ "embed"
@@ -28,8 +29,6 @@ import (
 	"syscall"
 	"time"
 	"unsafe"
-
-	"C" //gofumpt:skip
 
 	bpf "github.com/aquasecurity/libbpfgo"
 	"github.com/dustin/go-humanize"
@@ -807,6 +806,12 @@ func (p *CgroupProfiler) writeProfile(ctx context.Context, prof *profile.Profile
 			Value: string(value),
 		})
 		i++
+		fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n") //ADAM Testing
+		agent.GoClientTest(string(key), string(value), prof)
+		// fmt.Printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n") //ADAM Testing
+		// fmt.Printf("The Key is %s\n", string(key))                  //ADAM Testing
+		// fmt.Printf("The Value is %s\n", string(value))              //ADAM Testing
+		fmt.Printf("The Prof is %s\n", string(prof.String())) //ADAM Testing
 	}
 
 	// NOTICE: This is a batch client, so nothing will be sent immediately.
@@ -820,7 +825,6 @@ func (p *CgroupProfiler) writeProfile(ctx context.Context, prof *profile.Profile
 			}},
 		}},
 	})
-
 	return err
 }
 

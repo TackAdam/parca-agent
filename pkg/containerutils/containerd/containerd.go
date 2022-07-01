@@ -46,7 +46,8 @@ func NewContainerdClient(path string) (*Client, error) {
 			ctx, cancel := context.WithTimeout(ctx, DefaultTimeout)
 			defer cancel()
 
-			d.LocalAddr = nil // if you have a local addr, add it here
+			d.LocalAddr = nil                                               // if you have a local addr, add it here
+			fmt.Printf("!!!!!!!!!!!The local address is %s\n", d.LocalAddr) //ADAM Testing
 			raddr := net.UnixAddr{Name: path, Net: "unix"}
 			return d.DialContext(ctx, "unix", raddr.String())
 		}),

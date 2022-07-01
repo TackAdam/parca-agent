@@ -153,6 +153,9 @@ func main() {
 			level.Error(logger).Log("err", err)
 			os.Exit(1)
 		}
+		//Testing Print Adam
+		level.Warn(logger).Log("TestingPRINTADAM")
+		level.Warn(logger).Log(flags.StoreAddress)
 
 		// Initialize actual clients with the connection.
 		profileStoreClient = profilestorepb.NewProfileStoreServiceClient(conn)
