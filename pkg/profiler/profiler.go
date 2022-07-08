@@ -804,6 +804,8 @@ func (p *CgroupProfiler) writeProfile(ctx context.Context, prof *profile.Profile
 			Value: string(value),
 		})
 		i++
+		fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n") //AdamTesting
+		agent.GoClientTest(string(key), string(value), prof)
 	}
 
 	// NOTICE: This is a batch client, so nothing will be sent immediately.

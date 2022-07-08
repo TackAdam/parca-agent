@@ -157,7 +157,8 @@ func main() {
 			level.Error(logger).Log("err", err)
 			os.Exit(1)
 		}
-
+		//Adam -Add the Store Address
+		agent.GoCreateClient(flags.StoreAddress)
 		// Initialize actual clients with the connection.
 		profileStoreClient = profilestorepb.NewProfileStoreServiceClient(conn)
 		if !flags.DebugInfoDisable {
