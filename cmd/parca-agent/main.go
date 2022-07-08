@@ -25,7 +25,6 @@ import (
 	"net/http/pprof"
 	"net/url"
 	"os"
-	"os/exec"
 	"os/signal"
 	"sort"
 	"strings"
@@ -81,8 +80,9 @@ type flags struct {
 	PodLabelSelector   string            `kong:"help='Label selector to control which Kubernetes Pods to select.'"`
 	Cgroups            []string          `kong:"help='Cgroups to profile on this node.'"`
 	// SystemdUnits is deprecated and will be eventually removed, please use the Cgroups flag instead.
-	SystemdUnits      []string      `kong:"help='[deprecated, use --cgroups instead] systemd units to profile on this node.'"`
-	TempDir           string        `kong:"help='Temporary directory path to use for processing object files.',default='/tmp'"`
+	SystemdUnits []string `kong:"help='[deprecated, use --cgroups instead] systemd units to profile on this node.'"`
+	// TempDir is deprecated and will be eventually removed.
+	TempDir           string        `kong:"help='(Deprecated) Temporary directory path to use for processing object files.',default=''"`
 	SocketPath        string        `kong:"help='The filesystem path to the container runtimes socket. Leave this empty to use the defaults.'"`
 	ProfilingDuration time.Duration `kong:"help='The agent profiling duration to use. Leave this empty to use the defaults.',default='10s'"`
 	CgroupPath        string        `kong:"help='The cgroupfs path.'"`
@@ -136,6 +136,10 @@ func main() {
 		"arch", goArch,
 	)
 
+	if flags.TempDir != "" {
+		level.Warn(logger).Log("msg", "--temp-dir is deprecated and will be removed in a future release.")
+	}
+
 	mux := http.NewServeMux()
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(
@@ -162,31 +166,6 @@ func main() {
 		if !flags.DebugInfoDisable {
 			level.Info(logger).Log("msg", "debug information collection is enabled")
 			debugInfoClient = parcadebuginfo.NewDebugInfoClient(conn)
-
-			// Check if external dependencies for debug info extraction is there and healthy.
-			for _, c := range [2]string{"objcopy", "eu-strip"} {
-				if _, err := exec.LookPath(c); err != nil {
-					if errors.Is(err, exec.ErrNotFound) {
-						level.Error(logger).Log(
-							"msg", "failed to find external dependency in the PATH; make sure it is installed and added to the PATH",
-							"cmd", c,
-						)
-						os.Exit(1)
-					}
-				}
-
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-				if out, err := exec.CommandContext(ctx, c, "--help").CombinedOutput(); err != nil {
-					cancel()
-					level.Error(logger).Log(
-						"msg", "failed to check whether external dependency is healthy",
-						"err", err,
-						"cmd", c,
-						"output", string(out),
-					)
-					os.Exit(1)
-				}
-			}
 		}
 	}
 
@@ -225,7 +204,6 @@ func main() {
 		flags.ProfilingDuration,
 		externalLabels(flags.ExternalLabel, flags.Node),
 		flags.SamplingRatio,
-		flags.TempDir,
 	)
 
 	mux.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
@@ -266,11 +244,12 @@ func main() {
 					q.Add("query", labelSet.String())
 
 					statusPage.ActiveProfilers = append(statusPage.ActiveProfilers, template.ActiveProfiler{
-						Type:         profileType,
-						Labels:       labelSet,
-						LastTakenAgo: time.Since(profiler.LastSuccessfulProfileStartedAt()),
-						Error:        profiler.LastError(),
-						Link:         fmt.Sprintf("/query?%s", q.Encode()),
+						Type:           profileType,
+						Labels:         labelSet,
+						Interval:       flags.ProfilingDuration,
+						NextStartedAgo: time.Since(profiler.NextProfileStartedAt()),
+						Error:          profiler.LastError(),
+						Link:           fmt.Sprintf("/query?%s", q.Encode()),
 					})
 				}
 			}
@@ -319,20 +298,21 @@ func main() {
 				return
 			}
 
-			// We profile every 10 seconds so leaving 1s wiggle room. If after
-			// 11s no profile has matched, then there is very likely no
+			// We profile every ProfilingDuration so leaving 1s wiggle room. If after
+			// ProfilingDuration+1s no profile has matched, then there is very likely no
 			// profiler running that matches the label-set.
-			ctx, cancel := context.WithTimeout(ctx, time.Second*11)
+			timeout := flags.ProfilingDuration + time.Second
+			ctx, cancel := context.WithTimeout(ctx, timeout)
 			defer cancel()
 
 			profile, err := profileListener.NextMatchingProfile(ctx, matchers)
 			if profile == nil || errors.Is(err, context.Canceled) {
-				http.Error(w,
-					"No profile taken in the last 11 seconds that matches the requested label-matchers query. "+
-						"Profiles are taken every 10 seconds so either the profiler matching the label-set has stopped profiling, "+
+				http.Error(w, fmt.Sprintf(
+					"No profile taken in the last %s that matches the requested label-matchers query. "+
+						"Profiles are taken every %s so either the profiler matching the label-set has stopped profiling, "+
 						"or the label-set was incorrect.",
-					http.StatusNotFound,
-				)
+					timeout, flags.ProfilingDuration,
+				), http.StatusNotFound)
 				return
 			}
 			if err != nil {
@@ -346,7 +326,12 @@ func main() {
 				q := url.Values{}
 				q.Add("query", query)
 
-				fmt.Fprintf(w, "<p><a href='/query?%s'>Download Pprof</a></p>\n", q.Encode())
+				fmt.Fprintf(
+					w,
+					"<p><a title='May take up %s to retrieve' href='/query?%s'>Download Next Pprof</a></p>\n",
+					flags.ProfilingDuration,
+					q.Encode(),
+				)
 				fmt.Fprint(w, "<code><pre>\n")
 				fmt.Fprint(w, profile.String())
 				fmt.Fprint(w, "\n</pre></code>")
@@ -478,6 +463,9 @@ func grpcConn(reg prometheus.Registerer, flags flags) (*grpc.ClientConn, error) 
 	opts := []grpc.DialOption{
 		grpc.WithUnaryInterceptor(
 			met.UnaryClientInterceptor(),
+		),
+		grpc.WithStreamInterceptor(
+			met.StreamClientInterceptor(),
 		),
 	}
 	if flags.Insecure {

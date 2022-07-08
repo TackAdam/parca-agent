@@ -26,11 +26,16 @@ Install the following dependencies (Instructions are linked for each dependency)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
 - [LLVM](https://apt.llvm.org/)
 
+> **Note:** LLVM version 11 is enough to compile libbpf. However, Rust and Aya based toolchain requires LLVM version 14.
+
+For the debian based distributions:
     ```console
     $ sudo apt-get update
 
-    $ sudo apt-get install make clang llvm libbpf-dev libelf-dev
-     ```
+    $ sudo apt-get install make zlib1g pkg-config libclang-14-dev llvm-14-dev libbpf-dev libelf-dev
+    ```
+
+Install the rust nightly toolchain as defined in the root `rust-toolchain.toml`
 
 Alternatively, [Nix](https://nixos.org/download.html#download-nix) can be used to avoid installing system packages,
 simply run `nix-shell` (or `nix-shell shell.nix`) to load the dependencies. Docker and VirtualBox are required to be installed as system packages.
@@ -51,6 +56,8 @@ The following code snippet profiles the docker daemon, i.e. `docker.service` sys
 
 ```console
 $ cd parca-agent
+
+$ make -C bpf setup
 
 $ make
 
@@ -93,9 +100,10 @@ Please make sure to update tests as appropriate.
 
 This is roughly what the contribution workflow should look like:
 
-- Create a topic branch from where you want to base your work (usually master).
+- Create a topic branch from where you want to base your work (usually main).
 - Make commits of logical units.
 - Make sure the tests pass, and add any new tests as appropriate.
+- Use `make test` and `make test-e2e` to run unit tests and smoke tests respectively.
 - Make sure the code is properly formatted. (`make format` could be useful here.)
 - Make sure the code is properly linted. (`make lint` could be useful here.)
 - Make sure your commit messages follow the commit guidelines (see below).
