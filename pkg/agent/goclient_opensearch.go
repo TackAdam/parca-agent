@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/google/pprof/profile"
+	"github.com/joho/godotenv"
 	opensearch "github.com/opensearch-project/opensearch-go"
 	opensearchapi "github.com/opensearch-project/opensearch-go/opensearchapi"
 )
@@ -18,37 +20,51 @@ import (
 var GlobalStoreAddress = ""
 var TheClient *opensearch.Client
 
-const IndexName = "go-test-profiling"
+const IndexName = "go-test3"
 
 type Client struct {
 	Name       string `json:"name"`
 	Value      string `json:"value"`
 	Periodtype string `json:"periodtype"`
 	Period     int64  `json:"period"`
-	Time       string `json:"time"`
+	Time       int64  `json:"time"`
 	Duration   string `json:"duration"`
 	Samples    string `json:"samples"`
 	Locations  string `json:"locations"`
 	Mappings   string `json:"mappings"`
 }
 
-//openseachusername and opensearch password
-//use as authentication credentials
-//sample
 func GoCreateClient(theStoreAddress string) {
 	// Initialize the client with SSL/TLS enabled.
 	//check if it starts with http or https and then append if not there
-	GlobalStoreAddress = "http://" + theStoreAddress
-	fmt.Printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+	if theStoreAddress[0:1] == "h" {
+		GlobalStoreAddress = theStoreAddress
+	} else {
+		GlobalStoreAddress = "http://" + theStoreAddress
+	}
+
+	//Load the Username and Password
+	envErr := godotenv.Load(".env")
+	if envErr != nil {
+		fmt.Printf("Could not load .env file\n")
+	}
+
+	fmt.Printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n")
 	fmt.Printf("The address is %s\n", GlobalStoreAddress)
 	client, err := opensearch.NewClient(opensearch.Config{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
 		Addresses: []string{GlobalStoreAddress},
-		//Username:  "admin",
-		//Password:  "admin",
+		//use enviroment variables set OpenSearch username and pw os.Getenv(OPENSEARCH_USERNAME)
+		Username: os.Getenv("OPENSEARCH_USERNAME"),
+		Password: os.Getenv("OPENSEARCH_PASSWORD"),
 	})
+	//Make it a .env file located at top of directory
+	//OPENSEARCH_USERNAME=admin
+	//OPENSEARCH_PASSWORD=admin
+	fmt.Printf("Opensearch Username is %s\n", os.Getenv("OPENSEARCH_USERNAME"))
+	fmt.Printf("Opensearch Password is %s\n", os.Getenv("OPENSEARCH_PASSWORD"))
 	TheClient = client
 	//replace with logger
 	if err != nil {
@@ -60,18 +76,28 @@ func GoCreateClient(theStoreAddress string) {
 
 	// Define index mapping.
 	mapping := strings.NewReader(`{
-		'settings': {
-		  'index': {
-			   'number_of_shards': 4
-			   }
-			 }
-		}`)
+		"mappings": {
+			"properties": {
+				"name": { "type" : "keyword" },
+				"value": { "type" : "keyword" },
+				"periodtype": { "type" : "keyword" },
+				"period": { "type" : "integer" },
+				"time": { "type" : "date" },
+				"duration": { "type" : "float" },
+				"samples": { "type" : "keyword"},
+				"locations": { "type" : "keyword" },
+				"mappings": { "type" : "keyword" }
+			}
+		}
+	}`)
+
 	// Create an index with non-default settings.
 	//create only once after making client.
-	res := opensearchapi.IndicesCreateRequest{
+	req := opensearchapi.IndicesCreateRequest{
 		Index: IndexName,
 		Body:  mapping,
 	}
+	res, err := req.Do(context.Background(), TheClient)
 	fmt.Println("creating index", res)
 }
 
@@ -98,8 +124,8 @@ func GoClientTest(key string, value string, prof *profile.Profile) {
 		"theValue",
 		"ThePeriodType",
 		100,
-		"TheTime",
-		"43.43",
+		0,
+		"01.01",
 		"sample",
 		"location",
 		"mapping",
@@ -111,7 +137,8 @@ func GoClientTest(key string, value string, prof *profile.Profile) {
 		clients.Periodtype = fmt.Sprintf("%s %s", pt.Type, pt.Unit)
 	}
 	clients.Period = prof.Period
-	clients.Time = fmt.Sprintf("%v", time.Unix(0, prof.TimeNanos))
+	clients.Time = prof.TimeNanos / 1000000
+	//clients.Time = fmt.Sprintf("%v", time.Unix(0, prof.TimeNanos))
 	clients.Duration = fmt.Sprintf("%.4v", time.Duration(prof.DurationNanos))
 	clients.Samples = fmt.Sprintf("%s", prof.Sample)
 	clients.Locations = fmt.Sprintf("%s", prof.Location)
