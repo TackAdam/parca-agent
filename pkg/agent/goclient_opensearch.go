@@ -20,7 +20,7 @@ import (
 var GlobalStoreAddress = ""
 var TheClient *opensearch.Client
 
-const IndexName = "go-test3"
+const IndexName = "parca-agent-profile"
 
 type Client struct {
 	Name       string `json:"name"`
@@ -56,22 +56,20 @@ func GoCreateClient(theStoreAddress string) {
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
 		Addresses: []string{GlobalStoreAddress},
-		//use enviroment variables set OpenSearch username and pw os.Getenv(OPENSEARCH_USERNAME)
-		Username: os.Getenv("OPENSEARCH_USERNAME"),
-		Password: os.Getenv("OPENSEARCH_PASSWORD"),
+		Username:  os.Getenv("OPENSEARCH_USERNAME"),
+		Password:  os.Getenv("OPENSEARCH_PASSWORD"),
 	})
 	//Make it a .env file located at top of directory
 	//OPENSEARCH_USERNAME=admin
 	//OPENSEARCH_PASSWORD=admin
-	fmt.Printf("Opensearch Username is %s\n", os.Getenv("OPENSEARCH_USERNAME"))
-	fmt.Printf("Opensearch Password is %s\n", os.Getenv("OPENSEARCH_PASSWORD"))
+	//fmt.Printf("Opensearch Username is %s\n", os.Getenv("OPENSEARCH_USERNAME"))
+	//fmt.Printf("Opensearch Password is %s\n", os.Getenv("OPENSEARCH_PASSWORD"))
 	TheClient = client
 	//replace with logger
 	if err != nil {
 		fmt.Println("Error creating the OpenSearch client", err)
 	}
 	// Print OpenSearch version information on console.
-	//remove once used elsewhere
 	fmt.Println(client.Info())
 
 	// Define index mapping.
@@ -91,8 +89,7 @@ func GoCreateClient(theStoreAddress string) {
 		}
 	}`)
 
-	// Create an index with non-default settings.
-	//create only once after making client.
+	//Create an index with non-default settings.
 	req := opensearchapi.IndicesCreateRequest{
 		Index: IndexName,
 		Body:  mapping,
@@ -103,22 +100,6 @@ func GoCreateClient(theStoreAddress string) {
 
 //Create global variable for client or pass it in. create client only once
 func GoClientTest(key string, value string, prof *profile.Profile) {
-	// mapping := strings.NewReader(`{
-	// 	"mappings": {
-	// 		"properties": {
-	// 			"name":         { "type" : "keyword" },
-	// 			"value":        { "type" : "keyword" },
-	// 			"periodtype":   { "type" : "keyword" },
-	// 			"period":       { "type" : "integer" },
-	// 			"time":   	    { "type" : "date" },
-	// 			"duration":     { "type" : "float" },
-	// 			"samples":      { "type" : "object"},
-	// 			"locations": 	{ "type" : "object" },
-	// 			"mappings": 	{ "type" : "object" }
-	// 		}
-	// 	}
-	// 	}`)
-
 	clients := Client{
 		"theName",
 		"theValue",
@@ -137,8 +118,7 @@ func GoClientTest(key string, value string, prof *profile.Profile) {
 		clients.Periodtype = fmt.Sprintf("%s %s", pt.Type, pt.Unit)
 	}
 	clients.Period = prof.Period
-	clients.Time = prof.TimeNanos / 1000000
-	//clients.Time = fmt.Sprintf("%v", time.Unix(0, prof.TimeNanos))
+	clients.Time = prof.TimeNanos / 1000000 //To convert time from nanos
 	clients.Duration = fmt.Sprintf("%.4v", time.Duration(prof.DurationNanos))
 	clients.Samples = fmt.Sprintf("%s", prof.Sample)
 	clients.Locations = fmt.Sprintf("%s", prof.Location)
@@ -151,7 +131,7 @@ func GoClientTest(key string, value string, prof *profile.Profile) {
 	}
 	fmt.Printf("%s\n", finalJson) // Printing to check
 
-	// Add a document to the index.
+	//Add a document to the index.
 	document := bytes.NewReader(finalJson)
 
 	req := opensearchapi.IndexRequest{
