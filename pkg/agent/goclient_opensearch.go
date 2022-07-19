@@ -17,10 +17,11 @@ import (
 	opensearchapi "github.com/opensearch-project/opensearch-go/opensearchapi"
 )
 
+var IsInsecure = false
 var GlobalStoreAddress = ""
 var TheClient *opensearch.Client
 
-const IndexName = "parca-agent-profile"
+const IndexName = "parca_agent_profile"
 
 type Client struct {
 	Name       string `json:"name"`
@@ -32,6 +33,7 @@ type Client struct {
 	Samples    string `json:"samples"`
 	Locations  string `json:"locations"`
 	Mappings   string `json:"mappings"`
+	Functions  string `json:"functions"`
 }
 
 func GoCreateClient(theStoreAddress string) {
@@ -49,11 +51,11 @@ func GoCreateClient(theStoreAddress string) {
 		fmt.Printf("Could not load .env file\n")
 	}
 
-	fmt.Printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n")
+	//fmt.Printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n")
 	fmt.Printf("The address is %s\n", GlobalStoreAddress)
 	client, err := opensearch.NewClient(opensearch.Config{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: IsInsecure},
 		},
 		Addresses: []string{GlobalStoreAddress},
 		Username:  os.Getenv("OPENSEARCH_USERNAME"),
@@ -62,6 +64,7 @@ func GoCreateClient(theStoreAddress string) {
 	//Make it a .env file located at top of directory
 	//OPENSEARCH_USERNAME=admin
 	//OPENSEARCH_PASSWORD=admin
+	//fmt.Printf("InSecure setto %s\n", IsInsecure)
 	//fmt.Printf("Opensearch Username is %s\n", os.Getenv("OPENSEARCH_USERNAME"))
 	//fmt.Printf("Opensearch Password is %s\n", os.Getenv("OPENSEARCH_PASSWORD"))
 	TheClient = client
@@ -84,12 +87,14 @@ func GoCreateClient(theStoreAddress string) {
 				"duration": { "type" : "float" },
 				"samples": { "type" : "keyword"},
 				"locations": { "type" : "keyword" },
-				"mappings": { "type" : "keyword" }
+				"mappings": { "type" : "keyword" },
+				"functions": { "type" : "keyword" }
 			}
 		}
 	}`)
 
 	//Create an index with non-default settings.
+	//opensearch if exist request see if Index name
 	req := opensearchapi.IndicesCreateRequest{
 		Index: IndexName,
 		Body:  mapping,
@@ -99,17 +104,18 @@ func GoCreateClient(theStoreAddress string) {
 }
 
 //Create global variable for client or pass it in. create client only once
-func GoClientTest(key string, value string, prof *profile.Profile) {
+func GoClientWrite(key string, value string, prof *profile.Profile) error {
 	clients := Client{
 		"theName",
 		"theValue",
 		"ThePeriodType",
-		100,
+		0,
 		0,
 		"01.01",
 		"sample",
 		"location",
 		"mapping",
+		"function",
 	}
 
 	clients.Name = key
@@ -123,6 +129,7 @@ func GoClientTest(key string, value string, prof *profile.Profile) {
 	clients.Samples = fmt.Sprintf("%s", prof.Sample)
 	clients.Locations = fmt.Sprintf("%s", prof.Location)
 	clients.Mappings = fmt.Sprintf("%s", prof.Mapping)
+	clients.Functions = fmt.Sprintf("%s", prof.Function)
 
 	//finalJson, err := json.Marshal(clients)
 	finalJson, err := json.MarshalIndent(clients, "", "\t")
@@ -144,4 +151,6 @@ func GoClientTest(key string, value string, prof *profile.Profile) {
 		fmt.Println("failed to insert document ", err)
 	}
 	fmt.Println(insertResponse)
+	//add function return type
+	return err
 }
