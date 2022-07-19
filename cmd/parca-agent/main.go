@@ -379,14 +379,16 @@ func main() {
 		})
 	}
 
-	{
-		ctx, cancel := context.WithCancel(ctx)
-		g.Add(func() error {
-			level.Debug(logger).Log("msg", "starting batch write client")
-			return batchWriteClient.Run(ctx)
-		}, func(error) {
-			cancel()
-		})
+	if !flags.UseOpenSearch {
+		{
+			ctx, cancel := context.WithCancel(ctx)
+			g.Add(func() error {
+				level.Debug(logger).Log("msg", "starting batch write client")
+				return batchWriteClient.Run(ctx)
+			}, func(error) {
+				cancel()
+			})
+		}
 	}
 
 	var m *discovery.Manager
