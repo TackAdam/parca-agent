@@ -813,7 +813,7 @@ func (p *CgroupProfiler) writeProfile(ctx context.Context, prof *profile.Profile
 			}
 		}
 	}
-
+	//dont need to send if using opensearch
 	if !UseOpenSearch {
 		// NOTICE: This is a batch client, so nothing will be sent immediately.
 		// Make sure that the batch write client has the correct behavior if you change any parameters.

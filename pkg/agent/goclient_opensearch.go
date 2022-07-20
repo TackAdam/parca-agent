@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -37,7 +38,6 @@ type Client struct {
 }
 
 func GoCreateClient(theStoreAddress string) {
-	// Initialize the client with SSL/TLS enabled.
 	//check if it starts with http or https and then append if not there
 	if theStoreAddress[0:1] == "h" {
 		GlobalStoreAddress = theStoreAddress
@@ -48,11 +48,10 @@ func GoCreateClient(theStoreAddress string) {
 	//Load the Username and Password
 	envErr := godotenv.Load(".env")
 	if envErr != nil {
-		fmt.Printf("Could not load .env file\n")
+		log.Print("Could not load .env file\n")
 	}
 
-	//fmt.Printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n")
-	fmt.Printf("The address is %s\n", GlobalStoreAddress)
+	//fmt.Printf("The address is %s\n", GlobalStoreAddress)
 	client, err := opensearch.NewClient(opensearch.Config{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: IsInsecure},
@@ -62,18 +61,19 @@ func GoCreateClient(theStoreAddress string) {
 		Password:  os.Getenv("OPENSEARCH_PASSWORD"),
 	})
 	//Make it a .env file located at top of directory
-	//OPENSEARCH_USERNAME=admin
-	//OPENSEARCH_PASSWORD=admin
+	//OPENSEARCH_USERNAME=??
+	//OPENSEARCH_PASSWORD=??
 	//fmt.Printf("InSecure setto %s\n", IsInsecure)
 	//fmt.Printf("Opensearch Username is %s\n", os.Getenv("OPENSEARCH_USERNAME"))
 	//fmt.Printf("Opensearch Password is %s\n", os.Getenv("OPENSEARCH_PASSWORD"))
 	TheClient = client
-	//replace with logger
+
 	if err != nil {
-		fmt.Println("Error creating the OpenSearch client", err)
+		log.Fatalf("Error creating the OpenSearch client")
+		//fmt.Println("Error creating the OpenSearch client", err)
 	}
 	// Print OpenSearch version information on console.
-	fmt.Println(client.Info())
+	log.Println(client.Info())
 
 	// Define index mapping.
 	mapping := strings.NewReader(`{
@@ -95,12 +95,23 @@ func GoCreateClient(theStoreAddress string) {
 
 	//Create an index with non-default settings.
 	//opensearch if exist request see if Index name
-	req := opensearchapi.IndicesCreateRequest{
-		Index: IndexName,
-		Body:  mapping,
+	resp, err := opensearchapi.IndicesExistsRequest{
+		Index: []string{IndexName},
+	}.Do(context.Background(), TheClient)
+	//fmt.Printf("The responce is %s\n", resp)
+	//If status code is 404 then it does not exist already
+	if resp.StatusCode == 404 {
+		req := opensearchapi.IndicesCreateRequest{
+			Index: IndexName,
+			Body:  mapping,
+		}
+		res, err := req.Do(context.Background(), TheClient)
+		fmt.Println("creating index", res)
+		if err != nil {
+			log.Fatalf("failed to create index")
+			//fmt.Println("failed to create index ", err)
+		}
 	}
-	res, err := req.Do(context.Background(), TheClient)
-	fmt.Println("creating index", res)
 }
 
 //Create global variable for client or pass it in. create client only once
@@ -126,6 +137,8 @@ func GoClientWrite(key string, value string, prof *profile.Profile) error {
 	clients.Period = prof.Period
 	clients.Time = prof.TimeNanos / 1000000 //To convert time from nanos
 	clients.Duration = fmt.Sprintf("%.4v", time.Duration(prof.DurationNanos))
+
+	//clients.Samples = fmt.Sprintln(prof.Sample)
 	clients.Samples = fmt.Sprintf("%s", prof.Sample)
 	clients.Locations = fmt.Sprintf("%s", prof.Location)
 	clients.Mappings = fmt.Sprintf("%s", prof.Mapping)
@@ -136,7 +149,7 @@ func GoClientWrite(key string, value string, prof *profile.Profile) error {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("%s\n", finalJson) // Printing to check
+	log.Printf("%s\n", finalJson) // Printing to check
 
 	//Add a document to the index.
 	document := bytes.NewReader(finalJson)
@@ -148,9 +161,9 @@ func GoClientWrite(key string, value string, prof *profile.Profile) error {
 	insertResponse, err := req.Do(context.Background(), TheClient)
 
 	if err != nil {
-		fmt.Println("failed to insert document ", err)
+		log.Fatal(insertResponse)
+		//fmt.Println("failed to insert document ", err)
 	}
-	fmt.Println(insertResponse)
-	//add function return type
+	//fmt.Println(insertResponse)
 	return err
 }
