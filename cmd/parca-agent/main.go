@@ -90,7 +90,7 @@ type flags struct {
 	// SystemdCgroupPath is deprecated and will be eventually removed, please use the CgroupPath flag instead.
 	SystemdCgroupPath string `kong:"help='[deprecated, use --cgroup-path] The cgroupfs path to a systemd slice.'"`
 	DebugInfoDisable  bool   `kong:"help='Disable debuginfo collection.',default='false'"`
-	UseOpenSearch     bool   `kong:"help='Enable goClient to send to OpenSearch.',default='false'"`
+	UseOpenSearch     bool   `kong:"help='Using OpenSearch as the storage.',default='false'"`
 }
 
 func externalLabels(flagExternalLabels map[string]string, flagNode string) model.LabelSet {
@@ -470,7 +470,7 @@ func grpcConn(reg prometheus.Registerer, flags flags) (*grpc.ClientConn, error) 
 	}
 	if flags.Insecure {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		agent.IsInsecure = true //opensearch
+		agent.IsInsecure = true
 	} else {
 		config := &tls.Config{
 			//nolint:gosec
@@ -497,7 +497,6 @@ func grpcConn(reg prometheus.Registerer, flags flags) (*grpc.ClientConn, error) 
 		}))
 	}
 
-	//fmt.Printf("The use--open--search bool is set too %s\n", flags.UseOpenSearch)
 	if flags.UseOpenSearch {
 		//opensearch-Create the goClient Index in OpenSearch
 		agent.GoCreateClient(flags.StoreAddress)
