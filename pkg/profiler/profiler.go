@@ -805,7 +805,6 @@ func (p *CgroupProfiler) writeProfile(ctx context.Context, prof *profile.Profile
 		})
 		i++
 		//opensearch send the pprof data
-		//fmt.Printf("The UseOpenSearch bool is set too %s\n", UseOpenSearch)
 		if UseOpenSearch {
 			err = agent.GoClientWrite(string(key), string(value), prof)
 			if err != nil {
@@ -813,7 +812,6 @@ func (p *CgroupProfiler) writeProfile(ctx context.Context, prof *profile.Profile
 			}
 		}
 	}
-	//dont need to send if using opensearch
 	if !UseOpenSearch {
 		// NOTICE: This is a batch client, so nothing will be sent immediately.
 		// Make sure that the batch write client has the correct behavior if you change any parameters.

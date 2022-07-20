@@ -46,12 +46,12 @@ func GoCreateClient(theStoreAddress string) {
 	}
 
 	//Load the Username and Password
-	envErr := godotenv.Load(".env")
-	if envErr == nil {
+	err := godotenv.Load(".env")
+	if err == nil {
 		log.Print("Reading from .env file\n")
 	}
 
-	client, err := opensearch.NewClient(opensearch.Config{
+	OpenSearchClient, err = opensearch.NewClient(opensearch.Config{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: IsInsecure},
 		},
@@ -59,8 +59,6 @@ func GoCreateClient(theStoreAddress string) {
 		Username:  os.Getenv("OPENSEARCH_USERNAME"),
 		Password:  os.Getenv("OPENSEARCH_PASSWORD"),
 	})
-
-	OpenSearchClient = client
 
 	if err != nil {
 		log.Fatalf("Error creating the OpenSearch client")
@@ -84,7 +82,7 @@ func GoCreateClient(theStoreAddress string) {
 		}
 	}`)
 
-	resp, err := opensearchapi.IndicesExistsRequest{
+	resp, _ := opensearchapi.IndicesExistsRequest{
 		Index: []string{IndexName},
 	}.Do(context.Background(), OpenSearchClient)
 	//If status code is 404 then it does not exist already
